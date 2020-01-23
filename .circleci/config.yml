@@ -2,26 +2,59 @@
 #
 # Check https://circleci.com/docs/2.0/language-java/ for more details
 #
-version: 2
+version: 2.1
+orbs:
+  codecov: codecov/codecov@1.0.5
+workflows:
+  build_and_deploy:
+    jobs:
+      - build:
+          filters:
+            tags:
+              only: /.*/
+      - deploy:
+          requires:
+            - build
+          filters:
+            tags:
+              only: /v[0-9]+(\.[0-9]+)*/
+            branches:
+              ignore: /.*/
+
 jobs:
   build:
-    docker:
-      # specify the version you desire here
-      - image: circleci/openjdk:8-jdk
+    environment:
+        # Customize the JVM maximum heap limit
+        MAVEN_OPTS: -Xmx3200m
 
-      # Specify service dependencies here if necessary
-      # CircleCI maintains a library of pre-built images
-      # documented at https://circleci.com/docs/2.0/circleci-images/
-      # - image: circleci/postgres:9.4
+    docker:
+        # specify the version you desire here
+        - image: circleci/openjdk:11-jdk
+
+        # Specify service dependencies here if necessary
+        # CircleCI maintains a library of pre-built images
+        # documented at https://circleci.com/docs/2.0/circleci-images/
+        - image: circleci/postgres:12.0-alpine-ram
+          environment:
+            POSTGRES_USER: bastion
+            POSTGRES_PASSWORD: passw0rd
+            POSTGRES_DB: bastiondb
 
     working_directory: ~/repo
 
-    environment:
-      # Customize the JVM maximum heap limit
-      MAVEN_OPTS: -Xmx3200m
 
     steps:
       - checkout
+
+      - run:
+          name: install dockerize
+          command: wget https://github.com/jwilder/dockerize/releases/download/$DOCKERIZE_VERSION/dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && sudo tar -C /usr/local/bin -xzvf dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz && rm dockerize-linux-amd64-$DOCKERIZE_VERSION.tar.gz
+          environment:
+            DOCKERIZE_VERSION: v0.3.0
+
+      - run:
+          name: Wait for db
+          command: dockerize -wait tcp://localhost:5432 -timeout 1m
 
       # Download and cache dependencies
       - restore_cache:
@@ -30,12 +63,50 @@ jobs:
             # fallback to using the latest cache if no exact match is found
             - v1-dependencies-
 
-      - run: mvn dependency:go-offline
+      # run tests!
+      - run: mvn clean test
 
       - save_cache:
           paths:
             - ~/.m2
+            - ~/repo/target/node
           key: v1-dependencies-{{ checksum "pom.xml" }}
 
-      # run tests!
-      - run: mvn integration-test
+      - store_artifacts:
+          path:  target/surefire-reports
+
+      - codecov/upload:
+          file: target/site/jacoco/jacoco.xml
+
+  deploy:
+    docker:
+      - image: tokern/openjdk:13.0.1-buster
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+            - v1-dependencies-{{ checksum "pom.xml" }}
+            - v1-dependencies-{{ checksum "src/frontend/yarn.lock" }}
+            # fallback to using the latest cache if no exact match is found
+            - v1-dependencies-
+
+      - run: mvn package -DskipTests -Prelease
+
+      - save_cache:
+          paths:
+            - ~/repo/src/frontend/node_modules
+          key: v1-dependencies-{{ checksum "src/frontend/yarn.lock" }}
+
+      - setup_remote_docker
+
+      - run:
+          name: build docker and publish
+          command: |
+            ./docker/build_image.sh $CIRCLE_TAG --publish --latest
+
+      - run:
+          name: release
+          command: |
+            ~/go/bin/git-chglog $CIRCLE_TAG | ~/go/bin/github-release release --description - --tag $CIRCLE_TAG
+
+
