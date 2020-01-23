@@ -20,7 +20,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <dropwizard.version>2.0.0</dropwizard.version>
-        <mainClass>io.tokern.lineage.ServerApplication</mainClass>
+        <mainClass>io.tokern.lineage.LineageServer</mainClass>
     </properties>
 
     <dependencyManagement>
