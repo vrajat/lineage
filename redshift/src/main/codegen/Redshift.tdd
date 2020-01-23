@@ -1,0 +1,213 @@
+# Licensed to the Apache Software Foundation (ASF) under one
+# or more contributor license agreements.  See the NOTICE file
+# distributed with this work for additional information
+# regarding copyright ownership.  The ASF licenses this file
+# to you under the Apache License, Version 2.0 (the
+# "License"); you may not use this file except in compliance
+# with the License.  You may obtain a copy of the License at
+#
+# http:# www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{
+  # Generated parser implementation class package and name
+  package: "io.tokern.lineage.redshift",
+  class: "SqlRedshiftParser",
+
+  # List of import statements.
+  imports: [
+    "org.apache.calcite.schema.ColumnStrategy"
+    "org.apache.calcite.sql.SqlCreate"
+    "org.apache.calcite.sql.SqlDrop"
+    "org.apache.calcite.sql.ddl.SqlDdlNodes"
+    "io.tokern.lineage.redshift.Credentials"
+    "io.tokern.lineage.redshift.CustomSqlOperatorTable"
+    "io.tokern.lineage.redshift.SqlUnload"
+    "io.tokern.lineage.redshift.SqlCopy"
+    "io.tokern.lineage.redshift.SqlSelectInto"
+    "java.util.Map"
+    "java.util.HashMap"
+  ]
+
+  # List of keywords.
+  keywords: [
+    "ACCEPTANYDATE"
+    "ACCEPTINVCHARS"
+    "ADDQUOTES"
+    "ALLOWOVERWRITE"
+    "BLANKSASNULL"
+    "BZIP2"
+    "COMPROWS"
+    "COMPUPDATE"
+    "COPY"
+    "CREDENTIALS"
+    "CSV"
+    "DATEFORMAT"
+    "DELIMITER"
+    "EMPTYASNULL"
+    "ENCRYPTED"
+    "EXPLICIT_IDS"
+    "FILLRECORD"
+    "FIXEDWIDTH"
+    "GB"
+    "GZIP"
+    "IAM_ROLE"
+    "IF"
+    "IGNOREBLANKLINES"
+    "IGNOREHEADER"
+    "MANIFEST"
+    "MAXERROR"
+    "MAXFILESIZE"
+    "MB"
+    "NOLOAD"
+    "OFF"
+    "PARALLEL"
+    "REGION"
+    "REMOVEQUOTES"
+    "ROUNDEC"
+    "STATUPDATE"
+    "STORED"
+    "TEMP"
+    "TIMEFORMAT"
+    "TOP"
+    "TRIMBLANKS"
+    "TRUNCATECOLUMNS"
+    "UNLOAD"
+    "VERBOSE"
+    "VIRTUAL"
+  ]
+
+  # List of keywords from "keywords" section that are not reserved.
+  nonReservedKeywords: [
+    "A"
+    "ACCEPTANYDATE"
+    "ACCEPTINVCHARS"
+    "ADDQUOTES"
+    "ACTION"
+    "ALLOWOVERWRITE"
+    "ATOMIC"
+    "ATTRIBUTE"
+    "BLANKSASNULL"
+    "BZIP2"
+    "C"
+    "COMPROWS"
+    "COMPUPDATE"
+    "COPY"
+    "CREDENTIALS"
+    "CSV"
+    "DATABASE"
+    "DATE"
+    "DATEFORMAT"
+    "DAY"
+    "DELIMITER"
+    "DESCRIPTION"
+    "EMPTYASNULL"
+    "ENCRYPTED"
+    "EXCEPTION"
+    "EXPLICIT_IDS"
+    "FILLRECORD"
+    "FIXEDWIDTH"
+    "FORMAT"
+    "GB"
+    "GZIP"
+    "HOUR"
+    "IAM_ROLE"
+    "IF"
+    "IGNOREBLANKLINES"
+    "IGNOREHEADER"
+    "LANGUAGE"
+    "LEFT"
+    "M"
+    "MANIFEST"
+    "MAXERROR"
+    "MAXFILESIZE"
+    "MB"
+    "MEMBER"
+    "MINUTE"
+    "MONTH"
+    "NAME"
+    "NAMES"
+    "NOLOAD"
+    "OFF"
+    "PARALLEL"
+    "RANK"
+    "REGION"
+    "REMOVEQUOTES"
+    "REPLACE"
+    "RIGHT"
+    "ROUNDEC"
+    "ROWS"
+    "ROW_COUNT"
+    "SCHEMA_NAME"
+    "STATE"
+    "STATUPDATE"
+    "STORED"
+    "SOURCE"
+    "TEMP"
+    "TIMEFORMAT"
+    "TOP"
+    "TRIMBLANKS"
+    "TRUNCATECOLUMNS"
+    "UNLOAD"
+    "VALUE"
+    "VERBOSE"
+    "VERSION"
+    "VIRTUAL"
+    "WEEK"
+    "YEAR"
+  ]
+
+  # List of additional join types. Each is a method with no arguments.
+  # Example: LeftSemiJoin()
+  joinTypes: [
+  ]
+
+  # List of methods for parsing custom SQL statements.
+  statementParserMethods: [
+    "SqlUnloadStmt()"
+    "SqlCopyStmt()"
+  ]
+
+  # List of methods for parsing custom literals.
+  # Example: ParseJsonLiteral().
+  literalParserMethods: [
+  ]
+
+  # List of methods for parsing custom data types.
+  dataTypeParserMethods: [
+  ]
+
+  # List of methods for parsing extensions to "ALTER <scope>" calls.
+  # Each must accept arguments "(SqlParserPos pos, String scope)".
+  # Example: "SqlUploadJarNode"
+  alterStatementParserMethods: [
+  ]
+
+  # List of methods for parsing extensions to "CREATE [OR REPLACE]" calls.
+  # Each must accept arguments "(SqlParserPos pos, boolean replace)".
+  createStatementParserMethods: [
+    "SqlCreateTable"
+  ]
+
+  # List of methods for parsing extensions to "DROP" calls.
+  # Each must accept arguments "(SqlParserPos pos)".
+  dropStatementParserMethods: [
+  ]
+
+  # List of files in @includes directory that have parser method
+  # implementations for custom SQL statements, literals or types
+  # given as part of "statementParserMethods", "literalParserMethods" or
+  # "dataTypeParserMethods".
+  implementationFiles: [
+    "parserImpls.ftl"
+  ]
+  
+  includeCompoundIdentifier: true,
+  includeBraces: true,
+  includeAdditionalDeclarations: false,
+}

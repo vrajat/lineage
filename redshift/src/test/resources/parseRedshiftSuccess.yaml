@@ -1,0 +1,96 @@
+- name: A
+  query: select a.id from tbl a
+- name: action
+  query: select action from tbl a
+- name: atomic
+  query: select a.id from tbl atomic
+- name: attribute
+  query: select a.id, attribute from tbl atomic
+- name: C
+  query: select c.id from tbl c
+- name: database
+  query: select a, database from sch.tbl where name='abc'
+- name: day
+  query: select a, day from sch.tbl where name='abc'
+- name: description
+  query: select a, description from sch.tbl where name='abc'
+- name: format
+  query: select a, format from sch.tbl where name='abc'
+- name: language
+  query: select a, language from sch.tbl where name='abc'
+- name: left
+  query: select a, left(str, 6) from sch.tbl
+- name: m
+  query: select a, m.id from sch.tbl join m on sch.tbl.id = m.bid where name='abc'
+- name: name
+  query: select a, b from sch.tbl where name='abc'
+- name: member
+  query: select a, member from sch.tbl where name='abc'
+- name: minute
+  query: select a, minute from sch.tbl where name='abc'
+- name: rank
+  query: select a, b as rank from sch.tbl
+- name: replace
+  query: select a, replace from sch.tbl
+- name: right
+  query: select a, right(b) from sch.tbl
+- name: rows
+  query: select a, rows from sch.tbl
+- name: rowCount
+  query: select a, row_count from sch.tbl
+- name: SCHEMA_NAME
+  query: select a, st.SCHEMA_NAME from sch.tbl
+- name: state
+  query: select a, state from sch.tbl
+- name: source
+  query: select a, source from sch.tbl
+- name: value
+  query: select a, sum(value) from sch.tbl group by b
+- name: version
+  query: select a, sum(version) from sch.tbl group by b
+- name: week
+  query: select a, b.week from sch.tbl group by b
+- name: year
+  query: select a, b.year from sch.tbl group by b
+- name: quotes
+  query: select "a", "b" from sch.tbl group by "b"
+- name: insertSelectDual
+  query: insert into emps("x", "y") select 1,2
+- name: ctas
+  query: create table tbl as select id, dep from emps where id = 10
+- name: ctas_temp
+  query: create temp table tbl as select id, dep from emps where id = 10
+- name: ctas_quoted
+  query: create table tbl as select "id", "dep" from "emps" where "id" = 10
+- name: ctas_temp
+  query: create temp table tbl as select "id", "dep" from emps where "id" = 10
+- name: month
+  query: select a, sum(month) from sch.tbl group by b
+- name: exception
+  query: select a, sum(exception) from sch.tbl group by b
+- name: insertValues
+  query: insert into emps("x", "y") values(1,2)
+- name: unload
+  query: unload('select a, b from c') to 's3://bucket/dir' iam_role '' delimiter '^' ALLOWOVERWRITE ESCAPE PARALLEL OFF NULL AS ''
+- name: unload2
+  query: UNLOAD ('select * from "a"') to 's3://bucket/dir' iam_role '' delimiter '^' ALLOWOVERWRITE ESCAPE NULL AS ''
+- name: ilike
+  query: select a, b from c where d ilike 'xyz'
+- name: not_ilike
+  query: select a, b from c where d not ilike 'xyz'
+- name: copy
+  query: copy a.b from 's3://bucket/dir' CREDENTIALS '' JSON AS 's3://bucket/schema.json' REGION AS 'region' MAXERROR 1 TRUNCATECOLUMNS TIMEFORMAT 'auto' ACCEPTINVCHARS
+- name: copy_list
+  query: copy a.b(c, d, e) from 's3://bucket/dir' CREDENTIALS '' delimiter ',' REMOVEQUOTES ACCEPTINVCHARS IGNOREHEADER 1
+- name: copy_format_end
+  query: copy a.b(c, d, e) from 's3://bucket/dir' CREDENTIALS '' ACCEPTINVCHARS IGNOREHEADER 1 CSV
+- name: cast
+  query: select a::abc, b::abc from c
+- name: select_top
+  query: select top 5 a, b from d where e = 5
+- name: hash_identifier
+  query: "select a, b from d join #e_hash"
+- name: select_into
+  query: select a,b into oos from d where i = 5
+- name: insert_hash
+  query: "insert into #tbl select a,b from c"
