@@ -1,0 +1,1 @@
+insert into stv_inflight values(1, 1, 101, 'label', 10001, 202, '2018-10-02 11:00:00', 0);

@@ -1,0 +1,11 @@
+- name: basic_upload
+  target: s3://bucket/dir
+  sources:
+    - C
+  query: unload('select a, b from c') to 's3://bucket/dir' iam_role '' delimiter '^' ALLOWOVERWRITE ESCAPE PARALLEL OFF NULL AS ''
+- name: multiple_sources
+  target: s3://bucket/dir
+  sources:
+    - C
+    - D
+  query: unload('select a, b from c join d on c.id = d.id') to 's3://bucket/dir' iam_role '' delimiter '^' ALLOWOVERWRITE ESCAPE PARALLEL OFF NULL AS ''

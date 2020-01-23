@@ -1,0 +1,23 @@
+- name: basic
+  target: C
+  sources:
+    - A
+  query: insert into c select * from a
+- name: basic_join
+  target: C
+  sources:
+    - A
+    - B
+  query: insert into c select * from a join b on a.id = b.id
+- name: subquery
+  target: C
+  sources:
+    - A
+    - B
+  query: insert into c select * from (select * from a join b on a.id = b.id) x
+- name: alias
+  target: C
+  sources:
+    - A
+    - B
+  query: insert into c select * from (select * from a as aa join b on aa.id = b.id) x

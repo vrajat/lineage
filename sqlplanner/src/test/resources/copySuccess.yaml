@@ -1,0 +1,10 @@
+- name: copy
+  target: A.B
+  sources:
+    - s3://bucket/dir
+  query: copy a.b from 's3://bucket/dir' CREDENTIALS '' JSON AS 's3://bucket/schema.json' REGION AS 'region' MAXERROR 1 TRUNCATECOLUMNS TIMEFORMAT 'auto' ACCEPTINVCHARS
+- name: copy_list
+  target: A.B
+  sources:
+    - s3://bucket/dir
+  query: copy a.b(c, d, e) from 's3://bucket/dir' CREDENTIALS '' delimiter ',' REMOVEQUOTES ACCEPTINVCHARS IGNOREHEADER 1
