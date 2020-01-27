@@ -1,16 +1,15 @@
 package io.tokern.lineage.analyses.redshift;
 
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
 import com.google.common.graph.GraphBuilder;
 import com.google.common.graph.ImmutableGraph;
 import com.google.common.graph.MutableGraph;
 
 import com.codahale.metrics.ExponentiallyDecayingReservoir;
 import com.codahale.metrics.Histogram;
-import io.tokern.lineage.sqlplanner.visitors.CopyVisitor;
-import io.tokern.lineage.sqlplanner.visitors.CtasVisitor;
-import io.tokern.lineage.sqlplanner.visitors.InsertVisitor;
-import io.tokern.lineage.sqlplanner.visitors.SelectIntoVisitor;
-import io.tokern.lineage.sqlplanner.visitors.UnloadVisitor;
+import io.tokern.lineage.catalog.redshift.UserQuery;
+import io.tokern.lineage.sqlplanner.visitors.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -24,6 +23,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.PriorityQueue;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.stream.Collectors;
 
 public class Dag {
@@ -109,7 +109,7 @@ public class Dag {
     }
   }
 
-  static class Graph {
+  public static class Graph {
     public final ImmutableGraph<Node> dag;
     public final List<Phase> phases;
 
@@ -127,99 +127,80 @@ public class Dag {
     }
   }
 
+  static void addToNodeMap(Map<String, Node> nodeMap, DmlVisitor visitor, QueryInfo info) {
+    String targetTable = visitor.getTargetTable();
+    if (!nodeMap.containsKey(targetTable)) {
+      nodeMap.put(targetTable, new Node(targetTable));
+    }
+    Node node = nodeMap.get(targetTable);
+    node.addStartEndTime(info.query.startTime, info.query.endTime);
+    node.updateExecutionTimes(info.query.getDuration());
+    visitor.getSources().forEach((src) -> {
+      if (!nodeMap.containsKey(src)) {
+        nodeMap.put(src, new Node(src));
+      }
+    });
+  }
   /**
    * Generate a di-graph with tables as nodes and insert data movement as dependency.
    * @param infos Query information POJO
    * @return A Guava immutable graph of inserts
    */
-  static Graph buildGraph(List<QueryInfo> infos) {
+  static Graph buildGraph(List<UserQuery> queries, LoadingCache<UserQuery, QueryInfo> parsedQueryCache) {
     Map<String, Node> nodeMap = new HashMap<>();
 
     Node s3Source = new Node("S3 Source");
     Node s3Sink = new Node("S3 Sink");
 
-    infos.forEach((info) -> {
-      if (info.classes.insertContext.isPassed()) {
-        InsertVisitor visitor = info.classes.insertContext;
-        String targetTable = visitor.getTargetTable();
-        if (!nodeMap.containsKey(targetTable)) {
-          nodeMap.put(targetTable, new Node(targetTable));
+    queries.forEach((query) -> {
+      try {
+        QueryInfo info = parsedQueryCache.get(query);
+        if (info.classes.insertContext.isPassed()) {
+          addToNodeMap(nodeMap, info.classes.insertContext, info);
+        } else if (info.classes.ctasContext.isPassed()) {
+          addToNodeMap(nodeMap, info.classes.ctasContext, info);
+        } else if (info.classes.copyContext.isPassed()) {
+          addToNodeMap(nodeMap, info.classes.copyContext, info);
+        } else if (info.classes.unloadContext.isPassed()) {
+          UnloadVisitor visitor = info.classes.unloadContext;
+          visitor.getSources().forEach((src) -> {
+            if (!nodeMap.containsKey(src)) {
+              nodeMap.put(src, new Node(src));
+            }
+          });
+        } else if (info.classes.selectIntoContext.isPassed()) {
+          addToNodeMap(nodeMap, info.classes.selectIntoContext, info);
         }
-        Node node = nodeMap.get(targetTable);
-        node.addStartEndTime(info.query.startTime, info.query.endTime);
-        node.updateExecutionTimes(info.query.getDuration());
-        visitor.getSources().forEach((src) -> {
-          if (!nodeMap.containsKey(src)) {
-            nodeMap.put(src, new Node(src));
-          }
-        });
-      } else if (info.classes.ctasContext.isPassed()) {
-        CtasVisitor visitor = info.classes.ctasContext;
-        String targetTable = visitor.getTargetTable();
-        if (!nodeMap.containsKey(targetTable)) {
-          nodeMap.put(targetTable, new Node(targetTable));
-        }
-        Node node = nodeMap.get(targetTable);
-        node.addStartEndTime(info.query.startTime, info.query.endTime);
-        node.updateExecutionTimes(info.query.getDuration());
-        visitor.getSources().forEach((src) -> {
-          if (!nodeMap.containsKey(src)) {
-            nodeMap.put(src, new Node(src));
-          }
-        });
-      } else if (info.classes.copyContext.isPassed()) {
-        CopyVisitor visitor = info.classes.copyContext;
-        String targetTable = visitor.getTargetTable();
-        if (!nodeMap.containsKey(targetTable)) {
-          nodeMap.put(targetTable, new Node(targetTable));
-        }
-        Node node = nodeMap.get(targetTable);
-        node.addStartEndTime(info.query.startTime, info.query.endTime);
-        node.updateExecutionTimes(info.query.getDuration());
-      } else if (info.classes.unloadContext.isPassed()) {
-        UnloadVisitor visitor = info.classes.unloadContext;
-        visitor.getSources().forEach((src) -> {
-          if (!nodeMap.containsKey(src)) {
-            nodeMap.put(src, new Node(src));
-          }
-        });
-      } else if (info.classes.selectIntoContext.isPassed()) {
-        SelectIntoVisitor visitor = info.classes.selectIntoContext;
-        String targetTable = visitor.getTargetTable();
-        if (!nodeMap.containsKey(targetTable)) {
-          nodeMap.put(targetTable, new Node(targetTable));
-        }
-        Node node = nodeMap.get(targetTable);
-        node.addStartEndTime(info.query.startTime, info.query.endTime);
-        node.updateExecutionTimes(info.query.getDuration());
-        visitor.getSources().forEach((src) -> {
-          if (!nodeMap.containsKey(src)) {
-            nodeMap.put(src, new Node(src));
-          }
-        });
+      } catch (ExecutionException | CacheLoader.InvalidCacheLoadException exception) {
+        logger.warn(exception.getMessage());
       }
     });
 
     MutableGraph<Node> dag = GraphBuilder.directed().allowsSelfLoops(true).build();
-    infos.forEach((info) -> {
-      if (info.classes.insertContext.isPassed()) {
-        InsertVisitor visitor = info.classes.insertContext;
-        visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src),
-            nodeMap.get(visitor.getTargetTable())));
-      } else if (info.classes.ctasContext.isPassed()) {
-        CtasVisitor visitor = info.classes.ctasContext;
-        visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src),
-            nodeMap.get(visitor.getTargetTable())));
-      } else if (info.classes.unloadContext.isPassed()) {
-        UnloadVisitor visitor = info.classes.unloadContext;
-        visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src), s3Sink));
-      } else if (info.classes.copyContext.isPassed()) {
-        CopyVisitor visitor = info.classes.copyContext;
-        dag.putEdge(s3Source, nodeMap.get(visitor.getTargetTable()));
-      } else if (info.classes.selectIntoContext.isPassed()) {
-        SelectIntoVisitor visitor = info.classes.selectIntoContext;
-        visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src),
-            nodeMap.get(visitor.getTargetTable())));
+    queries.forEach((query) -> {
+      try {
+        QueryInfo info = parsedQueryCache.get(query);
+        if (info.classes.insertContext.isPassed()) {
+          InsertVisitor visitor = info.classes.insertContext;
+          visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src),
+              nodeMap.get(visitor.getTargetTable())));
+        } else if (info.classes.ctasContext.isPassed()) {
+          CtasVisitor visitor = info.classes.ctasContext;
+          visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src),
+              nodeMap.get(visitor.getTargetTable())));
+        } else if (info.classes.unloadContext.isPassed()) {
+          UnloadVisitor visitor = info.classes.unloadContext;
+          visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src), s3Sink));
+        } else if (info.classes.copyContext.isPassed()) {
+          CopyVisitor visitor = info.classes.copyContext;
+          dag.putEdge(s3Source, nodeMap.get(visitor.getTargetTable()));
+        } else if (info.classes.selectIntoContext.isPassed()) {
+          SelectIntoVisitor visitor = info.classes.selectIntoContext;
+          visitor.getSources().forEach(src -> dag.putEdge(nodeMap.get(src),
+              nodeMap.get(visitor.getTargetTable())));
+        }
+      } catch (ExecutionException | CacheLoader.InvalidCacheLoadException exception) {
+        logger.warn(exception.getMessage());
       }
     });
 

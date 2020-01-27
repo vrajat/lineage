@@ -9,6 +9,8 @@ import io.tokern.lineage.catalog.util.MetricAgentException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDateTime;
@@ -20,24 +22,28 @@ import java.util.stream.Collectors;
 public class RedshiftCsv implements Agent {
   private static Logger logger = LoggerFactory.getLogger(RedshiftCsv.class);
 
-  private final InputStream inputStream;
+  private final String pathDir;
+  private final Counter numFiles;
   private final Counter numSplits;
   private final Counter numQueries;
   private final Counter numSplitEndsWithSlash;
 
   /**
    * Process a CSV with redshift queries.
-   * @param is InputStream that points to the CSV
+   * @param pathDir Path containing CSV files
    * @param registry Global metric registry that manages all metrics
    */
-  public RedshiftCsv(InputStream is, MetricRegistry registry) {
-    this.inputStream = is;
+  public RedshiftCsv(String pathDir, MetricRegistry registry) {
+    this.pathDir = pathDir;
+
+    this.numFiles = registry.counter(MetricRegistry.name("numFiles",
+        "io", "tokern", "lineage", "RedshiftCsv"));
     this.numSplits = registry.counter(MetricRegistry.name("numSplits",
-        "io", "dblint", "RedshiftCsv"));
+        "io", "tokern", "lineage", "RedshiftCsv"));
     this.numQueries = registry.counter(MetricRegistry.name("numQueries",
-        "io", "dblint", "RedshiftCsv"));
+        "io", "tokern", "lineage", "RedshiftCsv"));
     this.numSplitEndsWithSlash = registry.counter(MetricRegistry.name("numSplitEndsWithSlash",
-        "io", "dblint", "RedshiftCsv"));
+        "io", "tokern", "lineage", "RedshiftCsv"));
 
   }
 
@@ -47,7 +53,7 @@ public class RedshiftCsv implements Agent {
    * @return A list of SplitUserQueries
    * @throws IOException Exception thrown if source cannot be read successfully.
    */
-  List<SplitUserQuery> getSplitQueries() throws IOException {
+  List<SplitUserQuery> getSplitQueries(InputStream inputStream) throws IOException {
     CsvMapper mapper = new CsvMapper();
     CsvSchema schema = CsvSchema.emptySchema().withHeader();
     MappingIterator<SplitUserQuery> iterator = mapper.readerFor(SplitUserQuery.class).with(schema)
@@ -73,7 +79,21 @@ public class RedshiftCsv implements Agent {
   public List<UserQuery> getQueries(LocalDateTime rangeStart, LocalDateTime rangeEnd)
       throws MetricAgentException {
     try {
-      final List<UserQuery> queries = combineSplits(getSplitQueries());
+      File path = new File(pathDir);
+      File [] files;
+
+      if (path.isDirectory()) {
+        files = path.listFiles();
+      } else {
+        files = new File[1];
+        files[0] = path;
+      }
+
+      final List<UserQuery> queries = new ArrayList<>();
+      for (File file : files) {
+        InputStream is = new FileInputStream(file);
+        queries.addAll(combineSplits(getSplitQueries(is)));
+      }
 
       logger.info("numSplits: " + numSplits.getCount());
       logger.info("numSplitEndsWithSlash:" + numSplitEndsWithSlash.getCount());

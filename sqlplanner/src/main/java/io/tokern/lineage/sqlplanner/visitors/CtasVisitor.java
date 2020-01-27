@@ -6,14 +6,9 @@ import org.apache.calcite.sql.SqlNode;
 import org.apache.calcite.sql.SqlSelect;
 import org.apache.calcite.sql.ddl.SqlCreateTable;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.stream.Collectors;
 
-public class CtasVisitor extends ClassifyingVisitor {
-  private SqlIdentifier targetTable;
-  private List<SqlIdentifier> sources = new ArrayList<>();
-
+public class CtasVisitor extends DmlVisitor {
   public CtasVisitor() {
     super(false);
   }
@@ -34,13 +29,5 @@ public class CtasVisitor extends ClassifyingVisitor {
       return null;
     }
     return super.visit(sqlCall);
-  }
-
-  public String getTargetTable() {
-    return targetTable.toString();
-  }
-
-  public List<String> getSources() {
-    return sources.stream().map(SqlIdentifier::toString).collect(Collectors.toList());
   }
 }
