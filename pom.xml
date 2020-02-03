@@ -22,6 +22,7 @@
     <guava.version>27.0.1-jre</guava.version>
     <metrics.version>4.0.0</metrics.version>
     <calcite.version>1.18.0</calcite.version>
+    <jacoco.version>0.8.5</jacoco.version>
   </properties>
   <dependencies>
 
@@ -73,6 +74,33 @@
             <version>1.2.0</version>
           </dependency>
         </dependencies>
+      </plugin>
+      <plugin>
+        <groupId>org.jacoco</groupId>
+        <artifactId>jacoco-maven-plugin</artifactId>
+        <version>${jacoco.version}</version>
+        <executions>
+          <execution>
+            <id>prepare-agent</id>
+            <goals>
+              <goal>prepare-agent</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>report</id>
+            <phase>prepare-package</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+          <execution>
+            <id>post-unit-test</id>
+            <phase>test</phase>
+            <goals>
+              <goal>report</goal>
+            </goals>
+          </execution>
+        </executions>
       </plugin>
     </plugins>
   </build>
