@@ -2,7 +2,9 @@ import React, {Component} from "react";
 import Cytoscape from "cytoscape"
 import CytoscapeComponent from "react-cytoscapejs";
 import {Container, Row} from "react-bootstrap";
-import graph from "./test_data";
+import test_graph from "./test_data";
+import getRandomName from "../utils/namesgenerator"
+import "tippy.js/themes/light.css"
 
 import klay from 'cytoscape-klay';
 import tippy from "tippy.js";
@@ -10,16 +12,34 @@ import popper from "cytoscape-popper";
 
 Cytoscape.use( popper ).use( klay );
 
+function anonymize(graph) {
+  let anonymized_names = {};
+
+  graph.nodes.forEach(node => {
+    anonymized_names[node['data']['id']] = getRandomName();
+  });
+  graph.nodes.forEach(node => {
+    let anonymized_node = node;
+    anonymized_node['data']['id'] = anonymized_names[node['data']['id']];
+  });
+
+  graph.edges.forEach(edge => {
+    let anonymized_edge = edge;
+    anonymized_edge['data']['source'] = anonymized_names[edge['data']['source']];
+    anonymized_edge['data']['target'] = anonymized_names[edge['data']['target']];
+  });
+
+  return graph;
+}
+
 class Dag extends Component {
   componentDidMount() {
     this.setUpListeners()
   }
 
   setUpListeners() {
-    console.log(this.cy);
     this.cy.ready(function (event) {
       event.cy.nodes().forEach(function (element) {
-        console.log(element);
         let ref = element.popperRef(); // used only for positioning
 
         let dummyDom = document.createElement('div');
@@ -34,6 +54,7 @@ class Dag extends Component {
 
             return content;
           },
+          theme: 'light',
           trigger: 'manual' // probably want manual mode
         });
       });
@@ -47,7 +68,7 @@ class Dag extends Component {
   }
 
   render() {
-    const dag = CytoscapeComponent.normalizeElements(graph);
+    const dag = CytoscapeComponent.normalizeElements(anonymize(test_graph));
     const layout = { name: 'klay', klay: {
       thoroughness: 30,
         direction: 'RIGHT',
@@ -57,6 +78,8 @@ class Dag extends Component {
       {
         selector: 'node',
         style: {
+          'width': 15,
+          'height': 15,
           'background-color': '#666',
         }
       },
@@ -64,10 +87,12 @@ class Dag extends Component {
       {
         selector: 'edge',
         style: {
-          'width': 3,
-          'line-color': '#111',
-          'target-arrow-color': '#ccc',
-          'target-arrow-shape': 'triangle'
+          'curve-style': 'bezier',
+          'width': 1,
+          'line-color': '#000',
+          'target-arrow-color': '#000',
+          'target-arrow-shape': 'vee',
+          'arrow-scale': 1
         }
       }
     ];
