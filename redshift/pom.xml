@@ -10,6 +10,7 @@
     <modelVersion>4.0.0</modelVersion>
 
     <artifactId>redshift</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
 
     <properties>
         <project.rootdir>${project.parent.basedir}</project.rootdir>

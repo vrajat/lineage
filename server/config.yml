@@ -2,3 +2,7 @@ logging:
   level: INFO
   loggers:
     io.tokern: DEBUG
+
+agent:
+  csv:
+    pathDir: /home/rajat/bb/redshift/stl_quoted.csv

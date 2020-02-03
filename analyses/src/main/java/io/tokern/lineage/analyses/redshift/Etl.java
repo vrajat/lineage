@@ -2,22 +2,27 @@ package io.tokern.lineage.analyses.redshift;
 
 import com.codahale.metrics.Counter;
 import com.codahale.metrics.MetricRegistry;
+import com.google.common.cache.CacheBuilder;
+import com.google.common.cache.CacheLoader;
+import com.google.common.cache.LoadingCache;
+import com.google.common.graph.GraphBuilder;
+import com.google.common.graph.ImmutableGraph;
+import com.google.common.graph.MutableGraph;
 import io.tokern.lineage.catalog.redshift.UserQuery;
+import io.tokern.lineage.sqlplanner.QanException;
 import io.tokern.lineage.sqlplanner.redshift.QueryClasses;
 import io.tokern.lineage.sqlplanner.redshift.RedshiftClassifier;
-import org.apache.calcite.sql.parser.SqlParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-class Etl {
+public class Etl {
 
-  static class Result {
+  public static class Result {
     final List<Gantt.Entry> gantt;
     final List<Gantt.TimeSlice> timeSlices;
-    final Dag.Graph dag;
+    public final Dag.Graph dag;
     final List<QueryInfo> queries;
 
     Result(List<Gantt.Entry> gantt, List<Gantt.TimeSlice> timeSlices,
@@ -26,6 +31,49 @@ class Etl {
       this.timeSlices = timeSlices;
       this.dag = dag;
       this.queries = queries;
+    }
+  }
+
+  class CachedParser extends CacheLoader<UserQuery, QueryInfo> {
+    @Override
+    public QueryInfo load(UserQuery userQuery) throws Exception {
+      QueryClasses classes = classifier.classify(userQuery.query);
+      numParsed.inc();
+
+      if (classes.maintenanceContext.isPassed()) {
+        numMaintenanceQueries.inc();
+      }
+
+      if (classes.insertContext.isPassed()) {
+        numInserts.inc();
+        if (classes.insertContext.getSources().size() > 0) {
+          logger.debug("Num Sources: " + classes.insertContext.getSources().size());
+          numInsertsWithSelects.inc();
+          return new QueryInfo(userQuery, classes);
+        }
+      }
+
+      if (classes.ctasContext.isPassed()) {
+        numCtasQueries.inc();
+        return new QueryInfo(userQuery, classes);
+      }
+
+      if (classes.unloadContext.isPassed()) {
+        numUnloadQueries.inc();
+        return new QueryInfo(userQuery, classes);
+      }
+
+      if (classes.copyContext.isPassed()) {
+        numCopyQueries.inc();
+        return new QueryInfo(userQuery, classes);
+      }
+
+      if (classes.selectIntoContext.isPassed()) {
+        numSelectInto.inc();
+        logger.debug("Select into for " + classes.selectIntoContext.getTargetTable());
+        return new QueryInfo(userQuery, classes);
+      }
+      throw new QanException("Query is not a DML Query");
     }
   }
 
@@ -43,33 +91,81 @@ class Etl {
 
   private RedshiftClassifier classifier;
 
-  Etl(MetricRegistry registry) {
-    numQueries = registry.counter("io.dblint.Etl.numQueries");
-    numParsed = registry.counter("io.dblint.Etl.numParsed");
-    numInserts = registry.counter("io.dblint.Etl.numInserts");
-    numInsertsWithSelects = registry.counter("io.dblint.Etl.numInsertSelects");
-    numMaintenanceQueries = registry.counter("io.dblint.Etl.numMaintenanceQueries");
-    numCtasQueries = registry.counter("io.dblint.Etl.numCtas");
-    numUnloadQueries = registry.counter("io.dblint.Etl.numUnload");
-    numCopyQueries = registry.counter("io.dblint.Etl.numCopy");
-    numSelectInto = registry.counter("io.dblint.Etl.numSelectInto");
+  private LoadingCache<UserQuery, QueryInfo> parsedQueryCache;
+
+  public Etl(MetricRegistry registry) {
+    numQueries = registry.counter("io.tokern.lineage.redshift.Etl.numQueries");
+    numParsed = registry.counter("io.tokern.lineage.redshift.Etl.numParsed");
+    numInserts = registry.counter("io.tokern.lineage.redshift.Etl.numInserts");
+    numInsertsWithSelects = registry.counter("io.tokern.lineage.redshift.Etl.numInsertSelects");
+    numMaintenanceQueries = registry.counter("io.tokern.lineage.redshift.Etl.numMaintenanceQueries");
+    numCtasQueries = registry.counter("io.tokern.lineage.redshift.Etl.numCtas");
+    numUnloadQueries = registry.counter("io.tokern.lineage.redshift.Etl.numUnload");
+    numCopyQueries = registry.counter("io.tokern.lineage.redshift.Etl.numCopy");
+    numSelectInto = registry.counter("io.tokern.lineage.redshift.Etl.numSelectInto");
 
     classifier = new RedshiftClassifier();
+    parsedQueryCache = CacheBuilder.newBuilder().maximumSize(200000).build(new CachedParser());
   }
 
-  Result analyze(List<UserQuery> userQueries) {
+  Dag.Node find(Dag.Graph graph, String sourceStr) throws QanException {
+    Dag.Node searchNode = new Dag.Node(sourceStr);
+    Iterator<Dag.Node> iterator = graph.dag.nodes().iterator();
+    while (iterator.hasNext()) {
+      Dag.Node i = iterator.next();
+      if (i.equals(searchNode)) {
+        return i;
+      }
+    }
+
+    throw new QanException(String.format("Node '%s' not found ", sourceStr));
+  }
+
+  public Dag.Graph getSubDag(List<UserQuery> userQueries, String node, boolean isPredecessor) throws QanException {
+    Dag.Graph graph = Dag.buildGraph(userQueries, parsedQueryCache);
+    Dag.Node source = find(graph, node);
+
+    MutableGraph<Dag.Node> subDag = GraphBuilder.directed().allowsSelfLoops(true).build();
+    List<Dag.Node> remainingNodes = new ArrayList<>();
+    Set<Dag.Node> processedNodes = new HashSet<>();
+
+    subDag.addNode(source);
+    remainingNodes.add(source);
+
+    while (!remainingNodes.isEmpty()) {
+      Dag.Node r = remainingNodes.remove(0);
+      Set<Dag.Node> connected = isPredecessor ? graph.dag.predecessors(r) : graph.dag.successors(r);
+      for (Dag.Node n : connected) {
+        if (!processedNodes.contains(n)) {
+          subDag.addNode(n);
+          remainingNodes.add(n);
+          processedNodes.add(n);
+        }
+        if (isPredecessor) {
+          subDag.putEdge(n, r);
+        } else {
+          subDag.putEdge(r, n);
+        }
+      }
+    }
+
+    ImmutableGraph<Dag.Node> immutableGraph = ImmutableGraph.copyOf(subDag);
+    List<Dag.Phase> phases = Dag.topologicalSort(immutableGraph);
+    return new Dag.Graph(immutableGraph, phases);
+  }
+
+  public Result analyze(List<UserQuery> userQueries) {
     numQueries.inc(userQueries.size());
 
     List<QueryInfo> queryInfos = null;
     longRunningQueries(userQueries);
-    queryInfos = parse(userQueries);
     logger.info("Queries parsed");
-    final Dag.Graph dag = Dag.buildGraph(queryInfos);
+    final Dag.Graph dag = Dag.buildGraph(userQueries, parsedQueryCache);
     logger.info("DAG created");
     logger.info("Node Graph Map created");
-    final List<Gantt.Entry> gantt = Gantt.sort(queryInfos);
+//    final List<Gantt.Entry> gantt = Gantt.sort(queryInfos);
     logger.info("Gantt created");
-    final List<Gantt.TimeSlice> timeSlices = Gantt.histogram(queryInfos);
+//    final List<Gantt.TimeSlice> timeSlices = Gantt.histogram(queryInfos);
     logger.info("Histogram created");
 
     logger.info("numQueries: " + numQueries.getCount());
@@ -82,7 +178,8 @@ class Etl {
     logger.info("numCopy: " + numCopyQueries.getCount());
     logger.info("numSelectInto: " + numSelectInto.getCount());
 
-    return new Result(gantt, timeSlices, dag, queryInfos);
+//    return new Result(gantt, timeSlices, dag, queryInfos);
+    return new Result(null, null, dag, null);
   }
 
   private void longRunningQueries(List<UserQuery> queries) {
@@ -93,52 +190,5 @@ class Etl {
         .forEach(q -> logger.info(q.toString()));
   }
 
-  List<QueryInfo> parse(List<UserQuery> queries) {
-    List<QueryInfo> queryInfos = new ArrayList<>();
-    queries.forEach((query) -> {
-      try {
-        QueryClasses classes = classifier.classify(query.query);
-        numParsed.inc();
 
-        if (classes.maintenanceContext.isPassed()) {
-          numMaintenanceQueries.inc();
-        }
-
-        if (classes.insertContext.isPassed()) {
-          if (classes.insertContext.getSources().size() > 0) {
-            logger.debug("Num Sources: " + classes.insertContext.getSources().size());
-            numInsertsWithSelects.inc();
-            queryInfos.add(new QueryInfo(query, classes));
-          }
-          numInserts.inc();
-        }
-
-        if (classes.ctasContext.isPassed()) {
-          numCtasQueries.inc();
-          queryInfos.add(new QueryInfo(query, classes));
-        }
-
-        if (classes.unloadContext.isPassed()) {
-          numUnloadQueries.inc();
-          queryInfos.add(new QueryInfo(query, classes));
-        }
-
-        if (classes.copyContext.isPassed()) {
-          numCopyQueries.inc();
-          queryInfos.add(new QueryInfo(query, classes));
-        }
-
-        if (classes.selectIntoContext.isPassed()) {
-          numSelectInto.inc();
-          logger.debug("Select into for " + classes.selectIntoContext.getTargetTable());
-          queryInfos.add(new QueryInfo(query, classes));
-        }
-      } catch (SqlParseException exception) {
-        logger.warn(query.query);
-        logger.warn(exception.getMessage());
-        logger.warn("~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~");
-      }
-    });
-    return queryInfos;
-  }
 }
