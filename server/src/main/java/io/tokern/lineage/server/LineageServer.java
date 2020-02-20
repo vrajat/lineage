@@ -2,6 +2,7 @@ package io.tokern.lineage.server;
 
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.dropwizard.Application;
+import io.dropwizard.assets.AssetsBundle;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.tokern.lineage.analyses.redshift.Dag;
@@ -26,6 +27,7 @@ public class LineageServer extends Application<LineageConfiguration> {
 
   @Override
   public void initialize(final Bootstrap<LineageConfiguration> bootstrap) {
+    bootstrap.addBundle(new AssetsBundle("/frontend/assets/", "/", "index.html"));
     SimpleModule module = new SimpleModule();
     module.addSerializer(Dag.Graph.class, new GraphSerializer());
     bootstrap.getObjectMapper().registerModule(module);

@@ -3,6 +3,9 @@ logging:
   loggers:
     io.tokern: DEBUG
 
+server:
+  rootPath: /api
+
 agent:
   csv:
     pathDir: /home/rajat/bb/redshift/stl_quoted.csv
