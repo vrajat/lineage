@@ -1,11 +1,12 @@
 logging:
   level: INFO
   loggers:
-    io.tokern: DEBUG
+    io.tokern: ${LINEAGE_LOG_LEVEL:-INFO}
 
 server:
   rootPath: /api
 
-agent:
+catalog:
   csv:
-    pathDir: /home/rajat/bb/redshift/stl_quoted.csv
+    pathDir: ${LINEAGE_CSV_PATH:-}
+

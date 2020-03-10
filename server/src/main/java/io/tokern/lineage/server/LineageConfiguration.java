@@ -1,16 +1,16 @@
 package io.tokern.lineage.server;
 
 import io.dropwizard.Configuration;
-import io.tokern.lineage.catalog.redshift.AgentConfiguration;
+import io.tokern.lineage.catalog.redshift.CatalogConfiguration;
 
 public class LineageConfiguration extends Configuration {
-  AgentConfiguration agent;
+  CatalogConfiguration catalog;
 
-  public AgentConfiguration getAgent() {
-    return agent;
+  public CatalogConfiguration getCatalog() {
+    return catalog;
   }
 
-  public void setAgent(AgentConfiguration agent) {
-    this.agent = agent;
+  public void setCatalog(CatalogConfiguration catalog) {
+    this.catalog = catalog;
   }
 }

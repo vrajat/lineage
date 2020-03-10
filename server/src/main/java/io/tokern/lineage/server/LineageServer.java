@@ -3,6 +3,8 @@ package io.tokern.lineage.server;
 import com.fasterxml.jackson.databind.module.SimpleModule;
 import io.dropwizard.Application;
 import io.dropwizard.assets.AssetsBundle;
+import io.dropwizard.configuration.EnvironmentVariableSubstitutor;
+import io.dropwizard.configuration.SubstitutingSourceProvider;
 import io.dropwizard.setup.Bootstrap;
 import io.dropwizard.setup.Environment;
 import io.tokern.lineage.analyses.redshift.Dag;
@@ -28,6 +30,11 @@ public class LineageServer extends Application<LineageConfiguration> {
   @Override
   public void initialize(final Bootstrap<LineageConfiguration> bootstrap) {
     bootstrap.addBundle(new AssetsBundle("/frontend/assets/", "/", "index.html"));
+    bootstrap.setConfigurationSourceProvider(
+        new SubstitutingSourceProvider(bootstrap.getConfigurationSourceProvider(),
+            new EnvironmentVariableSubstitutor(false)
+        )
+    );
     SimpleModule module = new SimpleModule();
     module.addSerializer(Dag.Graph.class, new GraphSerializer());
     bootstrap.getObjectMapper().registerModule(module);
@@ -39,8 +46,8 @@ public class LineageServer extends Application<LineageConfiguration> {
     Etl etl = new Etl(environment.metrics());
     Agent agent = null;
 
-    if (configuration.agent.getCsv() != null) {
-      agent = new RedshiftCsv(configuration.agent.getCsv().getPathDir(), environment.metrics());
+    if (configuration.catalog.getCsv() != null) {
+      agent = new RedshiftCsv(configuration.catalog.getCsv().getPathDir(), environment.metrics());
     }
 
     environment.jersey().register(new DagResource(etl, agent));

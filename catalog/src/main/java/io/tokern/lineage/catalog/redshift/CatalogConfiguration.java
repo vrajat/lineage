@@ -1,6 +1,6 @@
 package io.tokern.lineage.catalog.redshift;
 
-public class AgentConfiguration {
+public class CatalogConfiguration {
   public static class CsvConfiguration {
     String pathDir;
 
