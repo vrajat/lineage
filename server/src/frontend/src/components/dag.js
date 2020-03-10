@@ -2,13 +2,14 @@ import React, {Component} from "react";
 import Cytoscape from "cytoscape"
 import CytoscapeComponent from "react-cytoscapejs";
 import {Container, Row} from "react-bootstrap";
-import test_graph from "./test_data";
 import getRandomName from "../utils/namesgenerator"
 import "tippy.js/themes/light.css"
+import _ from 'lodash';
 
 import klay from 'cytoscape-klay';
 import tippy from "tippy.js";
 import popper from "cytoscape-popper";
+import NodeInput from "./nodeInput";
 
 Cytoscape.use( popper ).use( klay );
 
@@ -33,12 +34,56 @@ function anonymize(graph) {
 }
 
 class Dag extends Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      dag: CytoscapeComponent.normalizeElements({}),
+      layout: {
+        name: 'klay',
+        klay: {
+          thoroughness: 30,
+          direction: 'RIGHT',
+          nodePlacement: 'SIMPLE',
+        },
+      },
+      style: [ // the stylesheet for the graph
+        {
+          selector: 'node',
+          style: {
+            'width': 15,
+            'height': 15,
+            'background-color': '#666',
+          }
+        },
+
+        {
+          selector: 'edge',
+          style: {
+            'curve-style': 'bezier',
+            'width': 1,
+            'line-color': '#000',
+            'target-arrow-color': '#000',
+            'target-arrow-shape': 'vee',
+            'arrow-scale': 1
+          }
+        }
+      ],
+    };
+
+    this.handleCy = this.handleCy.bind(this);
+    this._handleCyCalled = false;
+  }
+
+  setDag = (dag) => {
+    this.setState({dag: CytoscapeComponent.normalizeElements(dag)});
+  };
+
   componentDidMount() {
     this.setUpListeners()
   }
 
   setUpListeners() {
-    this.cy.ready(function (event) {
+    this._cy.ready(function (event) {
       event.cy.nodes().forEach(function (element) {
         let ref = element.popperRef(); // used only for positioning
 
@@ -59,50 +104,56 @@ class Dag extends Component {
         });
       });
     });
-    this.cy.on('mouseover', 'node', function(event) {
+    this._cy.on('mouseover', 'node', function(event) {
       event.target.tippy.show()
     });
-    this.cy.on('mouseout', 'node', function(event) {
+    this._cy.on('mouseout', 'node', function(event) {
       event.target.tippy.hide()
     })
   }
 
-  render() {
-    const dag = CytoscapeComponent.normalizeElements(anonymize(test_graph));
-    const layout = { name: 'klay', klay: {
-      thoroughness: 30,
-        direction: 'RIGHT',
-        nodePlacement: 'SIMPLE',
-      }, };
-    const style = [ // the stylesheet for the graph
-      {
-        selector: 'node',
-        style: {
-          'width': 15,
-          'height': 15,
-          'background-color': '#666',
-        }
-      },
+  handleCy(cy) {
+    // If the cy pointer has not been modified, and handleCy has already
+    // been called before, than we don't run this function.
+    if (cy === this._cy && this._handleCyCalled) {
+      return;
+    }
+    this._cy = cy;
+    window.cy = cy;
+    this._handleCyCalled = true;
 
-      {
-        selector: 'edge',
-        style: {
-          'curve-style': 'bezier',
-          'width': 1,
-          'line-color': '#000',
-          'target-arrow-color': '#000',
-          'target-arrow-shape': 'vee',
-          'arrow-scale': 1
-        }
-      }
-    ];
+    // ///////////////////////////////////// CONSTANTS /////////////////////////////////////////
+    const SELECT_THRESHOLD = 100;
+
+    // ///////////////////////////////////// FUNCTIONS /////////////////////////////////////////
+    const refreshLayout = _.debounce(() => {
+      /**
+       * Refresh Layout if needed
+       */
+      const {
+        layout
+      } = this.state;
+
+      cy.layout(layout).run()
+    }, SELECT_THRESHOLD);
+
+    cy.on('add remove', () => {
+      refreshLayout();
+    });
+  }
+
+
+  render() {
     return(
         <Container>
           <Row>
-            <CytoscapeComponent elements={dag} style={ { width: '1500px', height: '1000px' } }
-                                layout={layout}
-                                stylesheet={style}
-                                cy={(cy) => {this.cy = cy}}
+            <NodeInput setGraph={this.setDag}/>
+          </Row>
+          <Row>
+            <CytoscapeComponent elements={this.state.dag} style={ { width: '1500px', height: '1000px' } }
+                                layout={this.state.layout}
+                                stylesheet={this.state.style}
+                                cy={this.handleCy}
             />;
           </Row>
         </Container>

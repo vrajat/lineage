@@ -44,17 +44,10 @@ public class GraphSerializerTest {
     List<Dag.Phase> phases = Dag.topologicalSort(immutableGraph);
     String serialized = mapper.writeValueAsString(
         new Dag.Graph(ImmutableGraph.copyOf(graph), phases));
-    assertEquals("{\"nodes\":[{\"table\":\"a\",\"startTimes\":[\"2019-01-15 06:30:00\"],"
-            + "\"endTimes\":[\"2019-01-15 06:40:00\"],"
-            + "\"numDegree\":0,\"mean\":10.0},{\"table\":\"b\","
-        + "\"startTimes\":[\"2019-01-15 07:30:00\"],"
-            + "\"endTimes\":[\"2019-01-15 07:40:00\"],"
-            + "\"numDegree\":0,\"mean\":10.0}"
-        + ",{\"table\":\"c\",\"startTimes\":[\"2019-01-15 07:30:00\"],"
-            + "\"endTimes\":[\"2019-01-15 07:40:00\"],"
-        +    "\"numDegree\":0,\"mean\":10.0}]"
-        +    ",\"edges\":[{\"source\":\"a\",\"target\":\"b\"},{\"source\":\"b\",\"target\":\"c\"}],"
-        + "\"phases\":[{\"tables\":[\"a\"]},{\"tables\":[\"b\"]},{\"tables\":[\"c\"]}]}"
+    assertEquals("{\"nodes\":[{\"data\":{\"id\":\"a\"}},{\"data\":{\"id\":\"b\"}},{\"data\":{\"id\":\"c\"}}]," +
+            "\"edges\":[{\"data\":{\"source\":\"a\",\"target\":\"b\"}},{\"data\":{\"source\":\"b\",\"target\":\"c\"}}]," +
+            "\"phases\":[{\"tables\":[\"a\"]},{\"tables\":[\"b\"]},{\"tables\":[\"c\"]}]}"
         , serialized);
+
   }
 }

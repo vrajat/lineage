@@ -25,14 +25,26 @@ public class GraphSerializer extends StdSerializer<Dag.Graph> {
     jgen.writeStartObject();
 
     jgen.writeFieldName("nodes");
-    jgen.writeObject(graph.dag.nodes());
+    jgen.writeStartArray();
+    for (Dag.Node node : graph.dag.nodes()) {
+      jgen.writeStartObject();
+      jgen.writeFieldName("data");
+      jgen.writeStartObject();
+      jgen.writeStringField("id", node.getTable());
+      jgen.writeEndObject();
+      jgen.writeEndObject();
+    }
+    jgen.writeEndArray();
 
     jgen.writeFieldName("edges");
     jgen.writeStartArray();
     for (EndpointPair<Dag.Node> pair : graph.dag.edges()) {
       jgen.writeStartObject();
+      jgen.writeFieldName("data");
+      jgen.writeStartObject();
       jgen.writeStringField("source", pair.source().getTable());
       jgen.writeStringField("target", pair.target().getTable());
+      jgen.writeEndObject();
       jgen.writeEndObject();
     }
 
