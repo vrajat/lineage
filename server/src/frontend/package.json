@@ -27,7 +27,9 @@
     "typescript": ">=3.7.0-beta"
   },
   "resolutions": {
-    "serialize-javascript": "^2.1.1"
+    "serialize-javascript": "^2.1.1",
+    "minimist": "^1.2.2",
+    "acorn": "^7.1.1"
   },
   "scripts": {
     "start": "react-scripts start",
